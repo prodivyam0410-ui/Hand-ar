@@ -11,32 +11,23 @@ body {
   overflow: hidden;
   background: black;
 }
-#video {
+video, canvas {
   position: fixed;
   top: 0;
   left: 0;
   width: 100vw;
   height: 100vh;
-  object-fit: cover;
-  z-index: 0;
 }
-canvas {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 1;
-}
+canvas { pointer-events: none; }
 #ui {
   position: fixed;
   bottom: 20px;
   left: 50%;
   transform: translateX(-50%);
-  z-index: 2;
-  display: flex;
-  gap: 10px;
+  z-index: 10;
 }
 button {
-  padding: 14px 18px;
+  padding: 14px 20px;
   font-size: 16px;
   background: #00ccff;
   border: none;
@@ -46,53 +37,30 @@ button {
 
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/three@0.152/build/three.min.js"></script>
 </head>
 
 <body>
 
 <video id="video" autoplay playsinline></video>
+<canvas id="draw"></canvas>
 
 <div id="ui">
-  <button onclick="start()"> Start</button>
-  <button onclick="clearCubes()"> Clear</button>
+  <button onclick="clearCanvas()">🧹 Clear</button>
 </div>
 
 <script>
-/* THREE */
-const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.01, 10);
-camera.position.z = 1;
+const video = document.getElementById("video");
+const canvas = document.getElementById("draw");
+const ctx = canvas.getContext("2d");
 
-const renderer = new THREE.WebGLRenderer({alpha:true});
-renderer.setSize(innerWidth, innerHeight);
-document.body.appendChild(renderer.domElement);
+canvas.width = innerWidth;
+canvas.height = innerHeight;
 
-scene.add(new THREE.AmbientLight(0x00ffff, 1.5));
-
-const cubes = [];
-
-function addCube(x,y){
-  const geo = new THREE.BoxGeometry(0.04,0.04,0.04);
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0x00ccff,
-    emissive: 0x00ffff,
-    emissiveIntensity: 1
-  });
-  const c = new THREE.Mesh(geo, mat);
-  c.position.set(x,y,0);
-  scene.add(c);
-  cubes.push(c);
-}
-
-function clearCubes(){
-  cubes.forEach(c=>scene.remove(c));
-  cubes.length = 0;
+function clearCanvas() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
 }
 
 /* HAND TRACKING */
-const video = document.getElementById("video");
-
 const hands = new Hands({
   locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
 });
@@ -103,34 +71,38 @@ hands.setOptions({
   minTrackingConfidence: 0.7
 });
 
-hands.onResults(res=>{
-  if(!res.multiHandLandmarks.length) return;
+hands.onResults(results => {
+  if (!results.multiHandLandmarks.length) return;
 
-  const lm = res.multiHandLandmarks[0];
+  const lm = results.multiHandLandmarks[0];
+  const thumb = lm[4];
+  const index = lm[8];
+
   const pinch = Math.hypot(
-    lm[4].x - lm[8].x,
-    lm[4].y - lm[8].y
+    thumb.x - index.x,
+    thumb.y - index.y
   );
 
-  if(pinch < 0.04){
-    addCube(lm[8].x - 0.5, -(lm[8].y - 0.5));
+  if (pinch < 0.04) {
+    const x = index.x * canvas.width;
+    const y = index.y * canvas.height;
+
+    ctx.fillStyle = "#00ccff";
+    ctx.shadowColor = "#00ffff";
+    ctx.shadowBlur = 20;
+    ctx.fillRect(x - 6, y - 6, 12, 12);
   }
 });
 
-function start(){
-  const cam = new Camera(video,{
-    onFrame: async()=>{await hands.send({image: video});},
-    width: 640,
-    height: 480
-  });
-  cam.start();
-}
-
-function animate(){
-  renderer.render(scene,camera);
-  requestAnimationFrame(animate);
-}
-animate();
+/* CAMERA */
+const camera = new Camera(video, {
+  onFrame: async () => {
+    await hands.send({ image: video });
+  },
+  width: 640,
+  height: 480
+});
+camera.start();
 </script>
 
 </body>
