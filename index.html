@@ -53,8 +53,12 @@ const video = document.getElementById("video");
 const canvas = document.getElementById("draw");
 const ctx = canvas.getContext("2d");
 
-canvas.width = innerWidth;
-canvas.height = innerHeight;
+function resize() {
+  canvas.width = innerWidth;
+  canvas.height = innerHeight;
+}
+resize();
+window.addEventListener("resize", resize);
 
 function clearCanvas() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -67,30 +71,38 @@ const hands = new Hands({
 
 hands.setOptions({
   maxNumHands: 1,
-  minDetectionConfidence: 0.7,
-  minTrackingConfidence: 0.7
+  minDetectionConfidence: 0.6,
+  minTrackingConfidence: 0.6
 });
 
 hands.onResults(results => {
-  if (!results.multiHandLandmarks.length) return;
+  if (!results.multiHandLandmarks) return;
+  if (results.multiHandLandmarks.length === 0) return;
 
   const lm = results.multiHandLandmarks[0];
   const thumb = lm[4];
   const index = lm[8];
 
+  // More forgiving pinch distance
   const pinch = Math.hypot(
     thumb.x - index.x,
     thumb.y - index.y
   );
 
-  if (pinch < 0.04) {
-    const x = index.x * canvas.width;
-    const y = index.y * canvas.height;
+  // Draw debug dot so we KNOW it's working
+  const dx = (1 - index.x) * canvas.width; // mirror fix
+  const dy = index.y * canvas.height;
 
+  ctx.fillStyle = "red";
+  ctx.beginPath();
+  ctx.arc(dx, dy, 5, 0, Math.PI * 2);
+  ctx.fill();
+
+  if (pinch < 0.07) {
     ctx.fillStyle = "#00ccff";
     ctx.shadowColor = "#00ffff";
-    ctx.shadowBlur = 20;
-    ctx.fillRect(x - 6, y - 6, 12, 12);
+    ctx.shadowBlur = 25;
+    ctx.fillRect(dx - 8, dy - 8, 16, 16);
   }
 });
 
@@ -107,3 +119,4 @@ camera.start();
 
 </body>
 </html>
+
