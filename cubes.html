@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AR Hand Hologram Drawing</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+body { margin:0; overflow:hidden; background:black; }
+#ui {
+ position: fixed;
+ bottom: 20px;
+ left: 50%;
+ transform: translateX(-50%);
+ display: flex;
+ gap: 10px;
+ z-index: 10;
+}
+button {
+ padding: 14px 18px;
+ font-size: 16px;
+ background: #00ccff;
+ border: none;
+ border-radius: 8px;
+}
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152/build/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.152/examples/jsm/webxr/ARButton.js"></script>
+</head>
+
+<body>
+
+<div id="ui">
+<button onclick="startCamera()">▶ Start Camera</button>
+<button onclick="clearCubes()">🧹 Clear</button>
+</div>
+
+<video id="video" autoplay playsinline style="display:none"></video>
+
+<script>
+let scene = new THREE.Scene();
+let camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.01, 20);
+let renderer = new THREE.WebGLRenderer({alpha:true});
+renderer.setSize(innerWidth, innerHeight);
+renderer.xr.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+scene.add(new THREE.PointLight(0x00ffff, 2));
+
+let cubes = [];
+
+function addCube(x,y,z){
+ let g = new THREE.BoxGeometry(0.03,0.03,0.03);
+ let m = new THREE.MeshStandardMaterial({
+  color:0x00ccff,
+  emissive:0x00ffff,
+  emissiveIntensity:1
+ });
+ let c = new THREE.Mesh(g,m);
+ c.position.set(x,y,z);
+ scene.add(c);
+ cubes.push(c);
+}
+
+function clearCubes(){
+ cubes.forEach(c=>scene.remove(c));
+ cubes=[];
+}
+
+const video = document.getElementById("video");
+
+const hands = new Hands({
+ locateFile:f=>`https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`
+});
+
+hands.setOptions({
+ maxNumHands:1,
+ minDetectionConfidence:0.7,
+ minTrackingConfidence:0.7
+});
+
+hands.onResults(r=>{
+ if(!r.multiHandLandmarks.length) return;
+ let lm = r.multiHandLandmarks[0];
+ let pinch = Math.hypot(lm[4].x-lm[8].x, lm[4].y-lm[8].y);
+ if(pinch<0.04){
+  addCube(lm[8].x-0.5, -(lm[8].y-0.5), -0.6);
+ }
+});
+
+let cam;
+function startCamera(){
+ cam = new Camera(video,{
+  onFrame: async()=>{await hands.send({image:video});},
+  width:640,
+  height:480
+ });
+ cam.start();
+ document.body.appendChild(ARButton.createButton(renderer));
+}
+
+renderer.setAnimationLoop(()=>renderer.render(scene,camera));
+</script>
+
+</body>
+</html>
